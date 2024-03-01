@@ -1,7 +1,14 @@
 #include <jni.h>
+#include <android/log.h> // Android logging
 #include <string>
 #include "noop_types.h"
 #include "profiler.cpp"
+
+#define APP_NAME "jni_playground"
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, APP_NAME, __VA_ARGS__))
+#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, APP_NAME, __VA_ARGS__))
+#define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, APP_NAME, __VA_ARGS__))
+#define logTime(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, APP_NAME, __VA_ARGS__))
 
 global_variable u64 estimateCPUFrequency;
 global_variable u64 startClocks;
@@ -37,7 +44,7 @@ Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_sumC(JNIEnv* env, jclas
   jsize size = env->GetArrayLength(javaIntArrayPtr);
   jint* javaIntArray = new jint[size];
   env->GetIntArrayRegion(javaIntArrayPtr, jsize{0}, size, javaIntArray);
-  jint* body = env->GetIntArrayElements(javaIntArrayPtr, 0);
+  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
   jint sum = 0;
   for(jsize i = 0; i < size; i++) {
     sum += body[i];
@@ -58,5 +65,15 @@ Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_plusOneC(JNIEnv* env, j
   jsize size = env->GetArrayLength(javaIntArrayPtr);
   jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
   for(jsize i = 0; i < size; i++){ body[i] += 1; }
+  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_reverseC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
+  jsize size = env->GetArrayLength(javaIntArrayPtr);
+  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+  jsize left = 0, right = size - 1;
+  jint tmp;
+  while(left < right){ tmp = body[left]; body[left++] = body[right]; body[right--] = tmp; }
   env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
 }

@@ -1,18 +1,21 @@
 package com.inasweaterpoorlyknit.jniplayground
 
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import androidx.lifecycle.lifecycleScope
-import dalvik.annotation.optimization.CriticalNative
 import dalvik.annotation.optimization.FastNative
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
 import kotlin.math.min
 import kotlin.random.Random
 
 val DEBUG_LOG_TAG = "jni_playground"
 fun logd(msg: String) = Log.d(DEBUG_LOG_TAG, msg)
+fun loge(msg: String) = Log.e(DEBUG_LOG_TAG, msg)
+fun logi(msg: String) = Log.i(DEBUG_LOG_TAG, msg)
 
 
 class MainActivity : AppCompatActivity() {
@@ -52,10 +55,100 @@ class MainActivity : AppCompatActivity() {
         logd("$title (iterations): $totalIterations")
     }
 
+    data class CPUInfo (
+        val processors: List<CPUInfoProcessor>,
+        val name: String
+    ) {
+        val features = processors.flatMap{ it.features.toSet() }.fold(setOf<String>()){ acc, it -> acc + it }
+        fun log() {
+            logi("=== CPU Information ===")
+            logi("Name: $name")
+            logi("Processor count: ${processors.size}")
+            logi("Supported features:${features.fold(StringBuilder()){ acc, it -> acc.append(" $it") }}").toString()
+        }
+    }
+
+    data class CPUInfoProcessor(
+        val index: Int,
+        val model: String,
+        val bogoMips: Float,
+        val features: List<String>
+    )
+
+    fun String.hasPrefix(prefix: String): Boolean {
+        if(length < prefix.length) return false
+        for(i in 0..prefix.lastIndex) {
+            if(this[i] != prefix[i]) return false
+        }
+        return true
+    }
+
+    fun fetchCpuInfo(): CPUInfo {
+        val cpuInfoFile = File("/proc/cpuinfo")
+        if(!cpuInfoFile.isFile) {
+            loge( "Could not open /proc/cpuinfo")
+            return CPUInfo(emptyList(), "")
+        }
+        val cpuProcessors = ArrayList<CPUInfoProcessor>()
+        var name = ""
+        val fileLines = cpuInfoFile.readLines()
+        var lineIter = 0
+        while(lineIter < fileLines.size) {
+            var line = fileLines[lineIter++]
+            when {
+                line.hasPrefix("processor") -> {
+                    val index = Regex("(0-9)+").find(line)?.value?.toInt() ?: -1
+                    var model = ""; var bogoMips = -1.0f; var features = ArrayList<String>();
+                    line = fileLines[lineIter++]
+                    while(line.isNotBlank()) {
+                        when {
+                            line.hasPrefix("model name") -> model = Regex("(?<=:\\s).+").find(line)?.value ?: ""
+                            line.hasPrefix("BogoMIPS") -> bogoMips = Regex("(?<=:\\s).+").find(line)?.value?.toFloat() ?: -1.0f
+                            line.hasPrefix("Features") -> features.addAll(
+                                Regex("(?<=:\\s).+").find(line)?.value?.split(regex = Regex("\\s+"))?.filter{ it.isNotEmpty() } ?: emptyList()
+                            )
+                        }
+                        line = fileLines[lineIter++]
+                    }
+                    cpuProcessors.add(CPUInfoProcessor(index, model, bogoMips, features))
+                }
+                line.hasPrefix("Hardware") -> {
+                    name = Regex("(?<=:\\s).+").find(line)?.value ?: ""
+                }
+            }
+        }
+        return CPUInfo(cpuProcessors, name)
+    }
+
+    fun fetchRamInfo() {
+        val memInfoFile = File("/proc/meminfo")
+        if(!memInfoFile.isFile) {
+            loge( "Could not open /proc/memInfo")
+            return
+        }
+        memInfoFile.readLines().forEach { logi(it) }
+    }
+
     private fun performanceTests() {
         lifecycleScope.launch(Dispatchers.Default) {
             initialize()
             val rand = Random(123)
+            Log.i(DEBUG_LOG_TAG, "Supported ABIs:" + Build.SUPPORTED_ABIS.fold(StringBuilder()){ acc, str -> acc.append(" $str") }).toString()
+            Log.i(DEBUG_LOG_TAG,"Model: " + Build.MODEL)
+            Log.i(DEBUG_LOG_TAG,"Manufacturer: " + Build.MANUFACTURER)
+            Log.i(DEBUG_LOG_TAG,"Brand: " + Build.BRAND)
+            Log.i(DEBUG_LOG_TAG,"SDK: " + Build.VERSION.SDK_INT.toString())
+            Log.i(DEBUG_LOG_TAG,"Board: " + Build.BOARD)
+            Log.i(DEBUG_LOG_TAG,"Product: " + Build.PRODUCT)
+            Log.i(DEBUG_LOG_TAG,"Device: " + Build.DEVICE)
+            if(Build.VERSION.SDK_INT >= 31){
+                Log.i(DEBUG_LOG_TAG,"SoC Manufacturer: " + Build.SOC_MANUFACTURER)
+                Log.i(DEBUG_LOG_TAG,"SoC Manufacturer: " + Build.SOC_MODEL)
+            }
+            val cpuInfo = fetchCpuInfo()
+            fetchRamInfo()
+            cpuInfo.log()
+
             logTimeHeader()
 
             // timer overhead
@@ -89,6 +182,27 @@ class MainActivity : AppCompatActivity() {
             // default sort in C
             val sortInCDuration = iterationTiming(setup = numbersCopy){ sortC(it) }
             sortInCDuration.log("Sorting in C")
+
+            // default reverse in Kotlin
+            val defaultReverseKotlinDuration = iterationTiming{
+                randomNumbers.reverse()
+            }
+            defaultReverseKotlinDuration.log("Default reverse in Kotlin")
+
+            // C-equivalent reverse in Kotlin
+            val reverseKotlinDuration = iterationTiming{
+                var left = 0; var right = randomNumbers.lastIndex; var tmp: Int;
+                while(left < right) {
+                    tmp = randomNumbers[left];
+                    randomNumbers[left++] = randomNumbers[right];
+                    randomNumbers[right--] = tmp;
+                }
+            }
+            reverseKotlinDuration.log("C-equivalent reverse in Kotlin")
+
+            // reverse array in C
+            val reverseCDuration = iterationTiming{ reverseC(randomNumbers) }
+            reverseCDuration.log("Reverse in C")
         }
     }
 
@@ -156,6 +270,8 @@ class MainActivity : AppCompatActivity() {
         @FastNative
         @JvmStatic
         external fun plusOneC(nums: IntArray)
+        @JvmStatic
+        external fun reverseC(nums: IntArray)
 
         @FastNative
         @JvmStatic
