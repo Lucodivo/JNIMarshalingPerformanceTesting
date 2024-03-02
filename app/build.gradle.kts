@@ -13,11 +13,13 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        ndk.abiFilters += setOf("armeabi-v7a", "arm64-v8a")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
+                arguments += "-DANDROID_ARM_NEON=ON"
             }
         }
     }

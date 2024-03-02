@@ -1,5 +1,6 @@
 #include <jni.h>
 #include <android/log.h> // Android logging
+#include <arm_neon.h>
 #include <string>
 #include "noop_types.h"
 #include "profiler.cpp"
@@ -75,5 +76,23 @@ Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_reverseC(JNIEnv* env, j
   jsize left = 0, right = size - 1;
   jint tmp;
   while(left < right){ tmp = body[left]; body[left++] = body[right]; body[right--] = tmp; }
+  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
+  jsize size = env->GetArrayLength(javaIntArrayPtr);
+  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+  int32x4_t plusOnex4 = vdupq_n_s32(1);
+  int32x4_t sum = vdupq_n_s32(0);
+  for(size_t i = 0; i < (size / 4); i++) {
+    int32_t* ptr = body + (i*4);
+    int32x4_t arrayVals = vld1q_s32(ptr);
+    vst1q_s32(ptr, vaddq_s32(arrayVals, plusOnex4));
+  }
+  // plus one the remainder
+  if(size & 3) {
+    for(jsize i = size - (size & 3); i < size; i++) { body[i] += 1; }
+  }
   env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
 }

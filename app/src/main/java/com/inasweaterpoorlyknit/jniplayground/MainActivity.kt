@@ -17,6 +17,24 @@ fun logd(msg: String) = Log.d(DEBUG_LOG_TAG, msg)
 fun loge(msg: String) = Log.e(DEBUG_LOG_TAG, msg)
 fun logi(msg: String) = Log.i(DEBUG_LOG_TAG, msg)
 
+fun List<String>.concatenated(separator: String = " "): String {
+    val concatStr = StringBuilder()
+    for(i in 0..<lastIndex) concatStr.append(this[0]).append(separator)
+    if(isNotEmpty()) concatStr.append(this[lastIndex])
+    return concatStr.toString()
+}
+
+fun Set<String>.concatenated(separator: String = " "): String {
+    val concatStr = StringBuilder()
+    val iter = iterator()
+    var concatCount = 0
+    while(concatCount < size){
+        concatStr.append(iter.next())
+        concatCount++
+    }
+    if(iter.hasNext()) concatStr.append(iter.next())
+    return concatStr.toString()
+}
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,23 +73,26 @@ class MainActivity : AppCompatActivity() {
         logd("$title (iterations): $totalIterations")
     }
 
-    data class CPUInfo (
-        val processors: List<CPUInfoProcessor>,
-        val name: String
+
+    data class CPUInfo(
+        val model: String,
+        val manufacturer: String,
+        val supportedABIs: List<String>,
+        val processors: List<SoCInfoProcessor>
     ) {
-        val features = processors.flatMap{ it.features.toSet() }.fold(setOf<String>()){ acc, it -> acc + it }
+        val processorFeatures = processors.flatMap{ it.features.toSet() }.fold(setOf<String>()){ acc, it -> acc + it }
         fun log() {
-            logi("=== CPU Information ===")
-            logi("Name: $name")
-            logi("Processor count: ${processors.size}")
-            logi("Supported features:${features.fold(StringBuilder()){ acc, it -> acc.append(" $it") }}").toString()
+            logd("=== CPU Information ===")
+            logd("Name: ${model.ifEmpty { "unknown" }}")
+            logd("Manufacturer: ${manufacturer.ifEmpty { "unknown" }}")
+            logd("Supported ABIs: ${supportedABIs.concatenated()}")
+            logd("Processor count: ${processors.size}")
+            logd("Processor features: ${processorFeatures.concatenated()}")
         }
     }
 
-    data class CPUInfoProcessor(
+    data class SoCInfoProcessor(
         val index: Int,
-        val model: String,
-        val bogoMips: Float,
         val features: List<String>
     )
 
@@ -87,37 +108,41 @@ class MainActivity : AppCompatActivity() {
         val cpuInfoFile = File("/proc/cpuinfo")
         if(!cpuInfoFile.isFile) {
             loge( "Could not open /proc/cpuinfo")
-            return CPUInfo(emptyList(), "")
+            return CPUInfo("", "", emptyList(), emptyList())
         }
-        val cpuProcessors = ArrayList<CPUInfoProcessor>()
-        var name = ""
+        val cpuProcessors = ArrayList<SoCInfoProcessor>()
+        var name = ""; var manufacturer = "";
         val fileLines = cpuInfoFile.readLines()
+        fileLines.forEach { logi(it) }
         var lineIter = 0
         while(lineIter < fileLines.size) {
             var line = fileLines[lineIter++]
             when {
                 line.hasPrefix("processor") -> {
                     val index = Regex("(0-9)+").find(line)?.value?.toInt() ?: -1
-                    var model = ""; var bogoMips = -1.0f; var features = ArrayList<String>();
+                    var model = ""; var features = ArrayList<String>();
                     line = fileLines[lineIter++]
                     while(line.isNotBlank()) {
                         when {
                             line.hasPrefix("model name") -> model = Regex("(?<=:\\s).+").find(line)?.value ?: ""
-                            line.hasPrefix("BogoMIPS") -> bogoMips = Regex("(?<=:\\s).+").find(line)?.value?.toFloat() ?: -1.0f
                             line.hasPrefix("Features") -> features.addAll(
                                 Regex("(?<=:\\s).+").find(line)?.value?.split(regex = Regex("\\s+"))?.filter{ it.isNotEmpty() } ?: emptyList()
                             )
                         }
                         line = fileLines[lineIter++]
                     }
-                    cpuProcessors.add(CPUInfoProcessor(index, model, bogoMips, features))
+                    cpuProcessors.add(SoCInfoProcessor(index, features))
                 }
                 line.hasPrefix("Hardware") -> {
                     name = Regex("(?<=:\\s).+").find(line)?.value ?: ""
                 }
             }
         }
-        return CPUInfo(cpuProcessors, name)
+        if(name.isEmpty() && Build.VERSION.SDK_INT >= 31) { // if name wasn't found in CPU Info, try Android.os.Bulid
+            name = Build.SOC_MODEL
+            manufacturer = Build.SOC_MANUFACTURER
+        }
+        return CPUInfo(name, manufacturer, Build.SUPPORTED_ABIS.toList(), cpuProcessors)
     }
 
     fun fetchRamInfo() {
@@ -143,7 +168,7 @@ class MainActivity : AppCompatActivity() {
             Log.i(DEBUG_LOG_TAG,"Device: " + Build.DEVICE)
             if(Build.VERSION.SDK_INT >= 31){
                 Log.i(DEBUG_LOG_TAG,"SoC Manufacturer: " + Build.SOC_MANUFACTURER)
-                Log.i(DEBUG_LOG_TAG,"SoC Manufacturer: " + Build.SOC_MODEL)
+                Log.i(DEBUG_LOG_TAG,"SoC Model: " + Build.SOC_MODEL)
             }
             val cpuInfo = fetchCpuInfo()
             fetchRamInfo()
@@ -155,17 +180,22 @@ class MainActivity : AppCompatActivity() {
             val timerOverheadDuration = iterationTiming{}
             timerOverheadDuration.log("C Timer Overhead")
 
-            val randomNumbers = IntArray(1_000_000) { rand.nextInt() }
+            val randomNumbers = IntArray(100_000) { rand.nextInt() }
             val numbersCopy: () -> IntArray = { randomNumbers.copyOf() }
 
             // plus one C
-            val numbersCPlusOne = numbersCopy()
-            val plusOneCDuration = iterationTiming{ plusOneC(numbersCPlusOne) }
+            val numbersPlusOneCopy = numbersCopy()
+            val plusOneCDuration = iterationTiming{ plusOneC(numbersPlusOneCopy) }
             plusOneCDuration.log("+1 C")
 
+            // plus one C Neon
+            for(i in 0..numbersPlusOneCopy.lastIndex){numbersPlusOneCopy[i] = randomNumbers[i]}
+            val plusOneCNeonDuration = iterationTiming { plusOneCNeon(numbersPlusOneCopy) }
+            plusOneCNeonDuration.log("+1 C Neon")
+
             // plus one in-place Kotlin
-            val numbersKotlinInPlacePlusOne = numbersCopy()
-            val plusOneInPlaceKotlinDuration = iterationTiming{ for(i in numbersKotlinInPlacePlusOne.indices){ numbersKotlinInPlacePlusOne[i] += 1 } }
+            for(i in 0..numbersPlusOneCopy.lastIndex){numbersPlusOneCopy[i] = randomNumbers[i]}
+            val plusOneInPlaceKotlinDuration = iterationTiming{ for(i in numbersPlusOneCopy.indices){ numbersPlusOneCopy[i] += 1 } }
             plusOneInPlaceKotlinDuration.log("+1 in-place Kotlin")
 
             // plus one map Kotlin
@@ -270,6 +300,9 @@ class MainActivity : AppCompatActivity() {
         @FastNative
         @JvmStatic
         external fun plusOneC(nums: IntArray)
+        @FastNative
+        @JvmStatic
+        external fun plusOneCNeon(nums: IntArray)
         @JvmStatic
         external fun reverseC(nums: IntArray)
 
