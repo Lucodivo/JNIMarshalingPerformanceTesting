@@ -12,7 +12,6 @@
 #define logTime(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, APP_NAME, __VA_ARGS__))
 
 global_variable u64 estimateCPUFrequency;
-global_variable u64 startClocks;
 
 extern "C" JNIEXPORT jstring JNICALL stringFromJni(JNIEnv* env, jclass);
 extern "C" JNIEXPORT void JNICALL reverseIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
@@ -21,9 +20,8 @@ extern "C" JNIEXPORT void JNICALL plusOneC(JNIEnv* env, jclass, jintArray javaIn
 extern "C" JNIEXPORT void JNICALL sortC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
 extern "C" JNIEXPORT jint JNICALL sumC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
 extern "C" JNIEXPORT jdouble JNICALL clocksToSeconds(JNIEnv*, jclass, jint clocks);
-extern "C" JNIEXPORT jint JNICALL endTime(JNIEnv*, jclass);
-extern "C" JNIEXPORT void JNICALL startTime(JNIEnv*, jclass);
-extern "C" JNIEXPORT void JNICALL initialize(JNIEnv*, jclass);
+extern "C" JNIEXPORT jint JNICALL getClocks(JNIEnv*, jclass);
+void initialize();
 
 JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNIEnv* env;
@@ -38,9 +36,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   // Register your class' native methods.
   static const JNINativeMethod methods[] = {
       {"stringFromJni", "()Ljava/lang/String;", reinterpret_cast<void*>(stringFromJni)},
-      {"initialize", "()V", reinterpret_cast<void*>(initialize)},
-      {"startTime", "()V", reinterpret_cast<void*>(startTime)},
-      {"endTime", "()I", reinterpret_cast<void*>(endTime)},
+      {"getClocks", "()I", reinterpret_cast<void*>(getClocks)},
       {"clocksToSeconds", "(I)D", reinterpret_cast<void*>(clocksToSeconds)},
       {"sumC", "([I)I", reinterpret_cast<void*>(sumC)},
       {"sortC", "([I)V", reinterpret_cast<void*>(sortC)},
@@ -51,24 +47,19 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   int rc = env->RegisterNatives(c, methods, sizeof(methods)/sizeof(JNINativeMethod));
   if (rc != JNI_OK) return rc;
 
+  initialize();
+
   return JNI_VERSION_1_6;
 }
+
+jint getClocks(JNIEnv*, jclass){ return ReadCPUTimer(); }
 
 jstring stringFromJni(JNIEnv* env, jclass) {
     return env->NewStringUTF("Hello from C++");
 }
 
-void initialize(JNIEnv*, jclass){
+void initialize(){
   estimateCPUFrequency = EstimateCPUTimerFreq(1000);
-}
-
-void startTime(JNIEnv*, jclass){
-  startClocks = ReadCPUTimer();
-}
-
-jint endTime(JNIEnv*, jclass){
-  u64 endClocks = ReadCPUTimer();
-  return endClocks - startClocks;
 }
 
 jdouble clocksToSeconds(JNIEnv*, jclass, jint clocks){
@@ -127,13 +118,11 @@ void plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
 }
 
 /*
-extern "C" JNIEXPORT void JNICALL
-Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_reverseStringC(JNIEnv* env, jclass, jstring javaStringPtr){
+extern "C" JNIEXPORT void JNICALL reverseStringC(JNIEnv* env, jclass, jstring javaStringPtr){
   jsize size = env->GetStringLength(javaStringPtr);
   const jchar* body = env->GetStringChars(javaStringPtr, NULL);
   jsize left = 0, right = size - 1;
   jint tmp;
   while(left < right){ tmp = body[left]; body[left++] = body[right]; body[right--] = tmp; }
   env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
-}
-*/
+}*/

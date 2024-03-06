@@ -22,13 +22,7 @@ class JNIFunctions {
 
         @FastNative
         @JvmStatic
-        external fun startTime()
-        @FastNative
-        @JvmStatic
-        external fun initialize()
-        @FastNative
-        @JvmStatic
-        external fun endTime(): Int
+        external fun getClocks(): Int
         @FastNative
         @JvmStatic
         external fun clocksToSeconds(clocks: Int): Double
