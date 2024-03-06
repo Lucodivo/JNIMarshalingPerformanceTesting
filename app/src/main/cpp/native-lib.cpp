@@ -14,34 +14,68 @@
 global_variable u64 estimateCPUFrequency;
 global_variable u64 startClocks;
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_stringFromJNI(JNIEnv* env, jclass) {
+extern "C" JNIEXPORT jstring JNICALL stringFromJni(JNIEnv* env, jclass);
+extern "C" JNIEXPORT void JNICALL reverseIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
+extern "C" JNIEXPORT void JNICALL plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
+extern "C" JNIEXPORT void JNICALL plusOneC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
+extern "C" JNIEXPORT void JNICALL sortC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
+extern "C" JNIEXPORT jint JNICALL sumC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
+extern "C" JNIEXPORT jdouble JNICALL clocksToSeconds(JNIEnv*, jclass, jint clocks);
+extern "C" JNIEXPORT jint JNICALL endTime(JNIEnv*, jclass);
+extern "C" JNIEXPORT void JNICALL startTime(JNIEnv*, jclass);
+extern "C" JNIEXPORT void JNICALL initialize(JNIEnv*, jclass);
+
+JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
+  JNIEnv* env;
+  if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+    return JNI_ERR;
+  }
+
+  // Find your class. JNI_OnLoad is called from the correct class loader context for this to work.
+  jclass c = env->FindClass("com/inasweaterpoorlyknit/jniplayground/JNIFunctions");
+  if (c == nullptr) return JNI_ERR;
+
+  // Register your class' native methods.
+  static const JNINativeMethod methods[] = {
+      {"stringFromJni", "()Ljava/lang/String;", reinterpret_cast<void*>(stringFromJni)},
+      {"initialize", "()V", reinterpret_cast<void*>(initialize)},
+      {"startTime", "()V", reinterpret_cast<void*>(startTime)},
+      {"endTime", "()I", reinterpret_cast<void*>(endTime)},
+      {"clocksToSeconds", "(I)D", reinterpret_cast<void*>(clocksToSeconds)},
+      {"sumC", "([I)I", reinterpret_cast<void*>(sumC)},
+      {"sortC", "([I)V", reinterpret_cast<void*>(sortC)},
+      {"plusOneC", "([I)V", reinterpret_cast<void*>(plusOneC)},
+      {"reverseIntArrayC", "([I)V", reinterpret_cast<void*>(reverseIntArrayC)},
+      {"plusOneCNeon", "([I)V", reinterpret_cast<void*>(plusOneCNeon)},
+  };
+  int rc = env->RegisterNatives(c, methods, sizeof(methods)/sizeof(JNINativeMethod));
+  if (rc != JNI_OK) return rc;
+
+  return JNI_VERSION_1_6;
+}
+
+jstring stringFromJni(JNIEnv* env, jclass) {
     return env->NewStringUTF("Hello from C++");
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_initialize(JNIEnv*, jclass){
+void initialize(JNIEnv*, jclass){
   estimateCPUFrequency = EstimateCPUTimerFreq(1000);
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_startTime(JNIEnv*, jclass){
+void startTime(JNIEnv*, jclass){
   startClocks = ReadCPUTimer();
 }
 
-extern "C" JNIEXPORT jint JNICALL
-Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_endTime(JNIEnv*, jclass){
+jint endTime(JNIEnv*, jclass){
   u64 endClocks = ReadCPUTimer();
   return endClocks - startClocks;
 }
 
-extern "C" JNIEXPORT jdouble JNICALL
-Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_clocksToSeconds(JNIEnv*, jclass, jint clocks){
+jdouble clocksToSeconds(JNIEnv*, jclass, jint clocks){
   return (double)clocks / (double)estimateCPUFrequency;
 }
 
-extern "C" JNIEXPORT jint JNICALL
-Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_sumC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
+jint sumC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
   jsize size = env->GetArrayLength(javaIntArrayPtr);
   jint* javaIntArray = new jint[size];
   env->GetIntArrayRegion(javaIntArrayPtr, jsize{0}, size, javaIntArray);
@@ -53,24 +87,21 @@ Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_sumC(JNIEnv* env, jclas
   return sum;
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_sortC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
+void sortC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
   jsize size = env->GetArrayLength(javaIntArrayPtr);
   jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
   std::sort(body, body + size);
   env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_plusOneC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
+void plusOneC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
   jsize size = env->GetArrayLength(javaIntArrayPtr);
   jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
   for(jsize i = 0; i < size; i++){ body[i] += 1; }
   env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_reverseC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
+void reverseIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
   jsize size = env->GetArrayLength(javaIntArrayPtr);
   jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
   jsize left = 0, right = size - 1;
@@ -79,12 +110,10 @@ Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_reverseC(JNIEnv* env, j
   env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
+void plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
   jsize size = env->GetArrayLength(javaIntArrayPtr);
   jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
   int32x4_t plusOnex4 = vdupq_n_s32(1);
-  int32x4_t sum = vdupq_n_s32(0);
   for(size_t i = 0; i < (size / 4); i++) {
     int32_t* ptr = body + (i*4);
     int32x4_t arrayVals = vld1q_s32(ptr);
@@ -96,3 +125,15 @@ Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_plusOneCNeon(JNIEnv* en
   }
   env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
 }
+
+/*
+extern "C" JNIEXPORT void JNICALL
+Java_com_inasweaterpoorlyknit_jniplayground_MainActivity_reverseStringC(JNIEnv* env, jclass, jstring javaStringPtr){
+  jsize size = env->GetStringLength(javaStringPtr);
+  const jchar* body = env->GetStringChars(javaStringPtr, NULL);
+  jsize left = 0, right = size - 1;
+  jint tmp;
+  while(left < right){ tmp = body[left]; body[left++] = body[right]; body[right--] = tmp; }
+  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+}
+*/

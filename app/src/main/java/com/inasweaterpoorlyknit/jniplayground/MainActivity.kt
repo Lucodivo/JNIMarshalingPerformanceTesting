@@ -4,8 +4,16 @@ import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
-import dalvik.annotation.optimization.FastNative
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.clocksToSeconds
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.endTime
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.initialize
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.plusOneC
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.plusOneCNeon
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.reverseIntArrayC
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.sortC
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.startTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -37,9 +45,14 @@ fun Set<String>.concatenated(separator: String = " "): String {
 }
 
 class MainActivity : AppCompatActivity() {
+    companion object {
+        private const val MAX_PRINT_SIZE = 90
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         performanceTests()
+        Toast.makeText(this, JNIFunctions.stringFromJni(), Toast.LENGTH_LONG).show()
     }
 
     fun logTimeHeader() {
@@ -231,7 +244,7 @@ class MainActivity : AppCompatActivity() {
             reverseKotlinDuration.log("C-equivalent reverse in Kotlin")
 
             // reverse array in C
-            val reverseCDuration = iterationTiming{ reverseC(randomNumbers) }
+            val reverseCDuration = iterationTiming{ reverseIntArrayC(randomNumbers) }
             reverseCDuration.log("Reverse in C")
         }
     }
@@ -281,42 +294,5 @@ class MainActivity : AppCompatActivity() {
         }
         s.append("${this[size-1]}]")
         return s.toString()
-    }
-
-    companion object {
-        private const val MAX_PRINT_SIZE = 90
-
-        // Used to load the 'jniplayground' library on application startup.
-        init {
-            System.loadLibrary("jniplayground")
-        }
-
-        @JvmStatic
-        external fun stringFromJNI(): String
-        @JvmStatic
-        external fun sumC(nums: IntArray): Int
-        @JvmStatic
-        external fun sortC(nums: IntArray)
-        @FastNative
-        @JvmStatic
-        external fun plusOneC(nums: IntArray)
-        @FastNative
-        @JvmStatic
-        external fun plusOneCNeon(nums: IntArray)
-        @JvmStatic
-        external fun reverseC(nums: IntArray)
-
-        @FastNative
-        @JvmStatic
-        external fun startTime()
-        @FastNative
-        @JvmStatic
-        external fun initialize()
-        @FastNative
-        @JvmStatic
-        external fun endTime(): Int
-        @FastNative
-        @JvmStatic
-        external fun clocksToSeconds(clocks: Int): Double
     }
 }
