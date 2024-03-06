@@ -214,9 +214,7 @@ class MainActivity : AppCompatActivity() {
 
             // plus one map Kotlin
             var numbersKotlinMapPlusOne: List<Int>
-            iterationTiming("+1 copy (map) Kotlin"){
-                numbersKotlinMapPlusOne = randomNumbers.map { it + 1 }
-            }.log()
+            iterationTiming("+1 copy (map) Kotlin"){ numbersKotlinMapPlusOne = randomNumbers.map { it + 1 } }.log()
 
             // default sort in Kotlin
             iterationTiming("Sorting in Kotlin", setup = numbersCopy){ it.sort() }.log()
@@ -225,9 +223,7 @@ class MainActivity : AppCompatActivity() {
             iterationTiming("Sorting in C", setup = numbersCopy){ sortC(it) }.log()
 
             // default reverse in Kotlin
-            iterationTiming("Default reverse in Kotlin"){
-                randomNumbers.reverse()
-            }.log()
+            iterationTiming("Default reverse in Kotlin"){ randomNumbers.reverse() }.log()
 
             // C-equivalent reverse in Kotlin
             iterationTiming("C-equivalent reverse in Kotlin"){
