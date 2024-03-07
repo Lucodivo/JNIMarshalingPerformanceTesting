@@ -19,6 +19,8 @@ class JNIFunctions {
         external fun plusOneCNeon(nums: IntArray)
         @JvmStatic
         external fun reverseIntArrayC(nums: IntArray)
+        @JvmStatic
+        external fun reverseStringC(str: String): String
 
         @FastNative
         @JvmStatic

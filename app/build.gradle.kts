@@ -7,6 +7,7 @@ android {
     namespace = "com.inasweaterpoorlyknit.jniplayground"
     compileSdk = 34
 
+
     defaultConfig {
         applicationId = "com.inasweaterpoorlyknit.jniplayground"
         minSdk = 24
@@ -19,7 +20,6 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
-                arguments += "-DANDROID_ARM_NEON=ON"
             }
         }
     }
@@ -35,6 +35,10 @@ android {
         }
         debug {
             isDebuggable = true
+            kotlinOptions {
+                // prevent: "'variable' was optimized out" issue while debugging coroutines
+                freeCompilerArgs += "-Xdebug"
+            }
         }
     }
     compileOptions {
@@ -56,7 +60,6 @@ android {
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)

@@ -1,27 +1,27 @@
-#include <jni.h>
-#include <android/log.h> // Android logging
-#include <arm_neon.h>
-#include <string>
+#include "native-lib.h"
+
 #include "noop_types.h"
 #include "profiler.cpp"
 
-#define APP_NAME "jni_playground"
-#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, APP_NAME, __VA_ARGS__))
-#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, APP_NAME, __VA_ARGS__))
-#define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, APP_NAME, __VA_ARGS__))
-#define logTime(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, APP_NAME, __VA_ARGS__))
+#include <string>
+
+#include <arm_neon.h>
+
+#ifdef __ANDROID__
+  #include <android/log.h>
+  #define APP_NAME "jni_playground"
+  #define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, APP_NAME, __VA_ARGS__))
+  #define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, APP_NAME, __VA_ARGS__))
+  #define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, APP_NAME, __VA_ARGS__))
+  #define logTime(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, APP_NAME, __VA_ARGS__))
+#elif
+  define LOGI(...)
+  #define LOGW(...)
+  #define LOGE(...)
+  #define logTime(...)
+#endif
 
 global_variable u64 estimateCPUFrequency;
-
-extern "C" JNIEXPORT jstring JNICALL stringFromJni(JNIEnv* env, jclass);
-extern "C" JNIEXPORT void JNICALL reverseIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
-extern "C" JNIEXPORT void JNICALL plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
-extern "C" JNIEXPORT void JNICALL plusOneC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
-extern "C" JNIEXPORT void JNICALL sortC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
-extern "C" JNIEXPORT jint JNICALL sumC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
-extern "C" JNIEXPORT jdouble JNICALL clocksToSeconds(JNIEnv*, jclass, jint clocks);
-extern "C" JNIEXPORT jint JNICALL getClocks(JNIEnv*, jclass);
-void initialize();
 
 JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNIEnv* env;
@@ -43,8 +43,9 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       {"plusOneC", "([I)V", reinterpret_cast<void*>(plusOneC)},
       {"reverseIntArrayC", "([I)V", reinterpret_cast<void*>(reverseIntArrayC)},
       {"plusOneCNeon", "([I)V", reinterpret_cast<void*>(plusOneCNeon)},
+      {"reverseStringC", "(Ljava/lang/String;)Ljava/lang/String;", reinterpret_cast<void*>(reverseStringC)},
   };
-  int rc = env->RegisterNatives(c, methods, sizeof(methods)/sizeof(JNINativeMethod));
+  jint rc = env->RegisterNatives(c, methods, sizeof(methods)/sizeof(JNINativeMethod));
   if (rc != JNI_OK) return rc;
 
   initialize();
@@ -117,12 +118,31 @@ void plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
   env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
 }
 
-/*
-extern "C" JNIEXPORT void JNICALL reverseStringC(JNIEnv* env, jclass, jstring javaStringPtr){
+jstring reverseStringC(JNIEnv* env, jclass, jstring javaStringPtr){
   jsize size = env->GetStringLength(javaStringPtr);
-  const jchar* body = env->GetStringChars(javaStringPtr, NULL);
+  jboolean isCopy = false;
+  const jchar* body = env->GetStringChars(javaStringPtr, &isCopy);
   jsize left = 0, right = size - 1;
   jint tmp;
-  while(left < right){ tmp = body[left]; body[left++] = body[right]; body[right--] = tmp; }
-  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
-}*/
+  jstring result;
+  if(isCopy) { // just edit the copy
+    while(left < right){
+      tmp = body[left];
+      ((jchar*)body)[left++] = body[right];
+      ((jchar*)body)[right--] = tmp;
+    }
+    result = env->NewString(body, size);
+  } else {
+    jchar* reversedBody = new jchar[size];
+    while(left < right){
+      tmp = body[left];
+      reversedBody[left++] = body[right];
+      reversedBody[right--] = tmp;
+    }
+    if(left == right){ reversedBody[left] = body[right]; }
+    result = env->NewString(reversedBody, size);
+    delete[] reversedBody;
+  }
+  env->ReleaseStringChars(javaStringPtr, body);
+  return result;
+}

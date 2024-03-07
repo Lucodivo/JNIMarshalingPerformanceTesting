@@ -1,4 +1,4 @@
-#include <sys/time.h>
+#include <time.h>
 
 static u64 GetOSTimerFreq(void)
 {
@@ -7,8 +7,6 @@ static u64 GetOSTimerFreq(void)
 
 static u64 ReadOSTimer(void)
 {
-  // NOTE(casey): The "struct" keyword is not necessary here when compiling in C++,
-  // but just in case anyone is using this file from C, I include it.
   struct timeval Value;
   gettimeofday(&Value, 0);
 
@@ -43,8 +41,7 @@ static u64 EstimateCPUTimerFreq(u64 msToWait)
   u64 CPUElapsed = CPUEnd - CPUStart;
 
   u64 CPUFreq = 0;
-  if(OSElapsed)
-  {
+  if(OSElapsed) {
     CPUFreq = OSFreq * CPUElapsed / OSElapsed;
   }
 
