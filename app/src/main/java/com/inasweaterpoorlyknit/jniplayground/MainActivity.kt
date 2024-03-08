@@ -7,12 +7,17 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.clocksToSeconds
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.copyIntArrayC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.getClocks
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.getMeasuredFrequency
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.nopC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.plusOneC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.plusOneCNeon
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.reverseIntArrayC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.reverseStringC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.sortC
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.stringFromJni
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.sumC
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -44,6 +49,26 @@ fun Set<String>.concatenated(separator: String = " "): String {
     return concatStr.toString()
 }
 
+fun clocksToString(clocks: Long): String  {
+    val seconds = clocksToSeconds(clocks)
+    return when {
+        seconds < 10.0e-6 -> { "${"%.2f".format(seconds*1_000_000_000)}ns" }
+        seconds < 1.0e-3 -> { "${"%.2f".format(seconds*1_000_000)}µs" }
+        seconds < 1.0 -> { "${"%.2f".format(seconds*1_000)}ms" }
+        else -> { "${"%.2f".format(seconds)}s" }
+    }
+}
+
+fun frequencyToHz(frequency: Long): String  {
+    return when(frequency) {
+        in 0..<1_000 -> return "${frequency}Hz"
+        in 1_000..<1_000_000 -> return "${"%.2f".format(frequency / 1_000.0)}KHz"
+        in 1_000_000..<1_000_000_000 -> return "${"%.2f".format(frequency / 1_000_000.0)}MHz"
+        in 1_000_000_000..<Long.MAX_VALUE -> return "${"%.2f".format(frequency / 1_000_000_000.0)}GHz"
+        else -> "Invalid Negative Frequency"
+    }
+}
+
 class MainActivity : AppCompatActivity() {
     companion object {
         private const val MAX_PRINT_SIZE = 90
@@ -52,12 +77,11 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         performanceTests()
-        Toast.makeText(this, JNIFunctions.stringFromJni(), Toast.LENGTH_LONG).show()
     }
 
     data class TimedWork(
-        val minClocks: Int,
-        val maxClocks: Int,
+        val minClocks: Long,
+        val maxClocks: Long,
         val totalIterations: Int,
     ){
         companion object {
@@ -73,13 +97,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
         fun log(title: String) {
-            fun logTime(title: String, clocks: Int) {
+            fun logTime(title: String, clocks: Long) {
                 val toPrint = CharArray(MAX_PRINT_SIZE){' '}
                 for(i in title.indices){
                     if(i == 40) break
                     toPrint[i] = title[i]
                 }
-                clocksToSeconds(clocks).toString().let{
+                clocksToString(clocks).let{
                     it.substring(0, min(40, it.length)).forEachIndexed { i, c ->
                         toPrint[i + 40] = c
                     }
@@ -203,10 +227,11 @@ class MainActivity : AppCompatActivity() {
             TimedWork.logTimeHeader()
 
             // timer overhead
-            iterationTiming{}.log("C Timer Overhead")
+            val timerOverhead = iterationTiming{}.apply{ log("C Timer Overhead") }
 
             val timedWork = HashMap<String, ArrayList<Pair<Int, TimedWork>>>()
             val testNumberOfElements = arrayOf(1, 10, 100, 1_000, 10_000, 100_000, 1_000_000)
+            var sum = 0;
             fun addTimedWork(tag: String, dataSize: Int, work: TimedWork) {
                 if(!timedWork.containsKey(tag)) { timedWork[tag] = ArrayList() }
                 timedWork.getOrPut(tag){ ArrayList() }.add(Pair(dataSize, work))
@@ -214,7 +239,25 @@ class MainActivity : AppCompatActivity() {
             testNumberOfElements.forEach { numElements ->
                 val randomNumbers = IntArray(numElements) { rand.nextInt() }
                 val numbersCopy: () -> IntArray = { randomNumbers.copyOf() }
+                val sumNumbers = IntArray(numElements) { rand.nextInt(-10, 11) }
                 val randomString = randomASCIIString(numElements)
+
+                val stringFromCTag = "string from C"
+                val stringFromCTimedWork = iterationTiming{ stringFromJni() }.apply { log("$stringFromCTag: $numElements") }
+                addTimedWork(stringFromCTag, numElements, stringFromCTimedWork)
+
+                val nopCTag = "nop C"
+                val nopCTimedWork = iterationTiming{ nopC(randomNumbers) }.apply { log("$nopCTag: $numElements") }
+                addTimedWork(nopCTag, numElements, nopCTimedWork)
+
+                val copyIntArrayCTag = "copy Int Array C"
+                var intArrayCopy: IntArray? = null
+                val copyIntArrayCTimedWork = iterationTiming{ intArrayCopy = copyIntArrayC(randomNumbers) }.apply { log("$copyIntArrayCTag: $numElements") }
+                addTimedWork(copyIntArrayCTag, numElements, copyIntArrayCTimedWork)
+
+                val copyIntArrayKotlinTag = "copy Int Array Kotlin"
+                val copyIntArrayKotlinTimedWork = iterationTiming{ intArrayCopy = randomNumbers.copyOf() }.apply { log("$copyIntArrayKotlinTag: $numElements") }
+                addTimedWork(copyIntArrayKotlinTag, numElements, copyIntArrayKotlinTimedWork)
 
                 // plus one C
                 val numbersPlusOneCopy = numbersCopy()
@@ -225,7 +268,7 @@ class MainActivity : AppCompatActivity() {
                 // plus one C Neon
                 val plusOneCNeonTag = "+1 C Neon"
                 for(i in 0..numbersPlusOneCopy.lastIndex){numbersPlusOneCopy[i] = randomNumbers[i]}
-                val plusOneCNeonTimedWork = iterationTiming { plusOneCNeon(numbersPlusOneCopy) }.apply{ log("$plusOneCNeonTag:  $numElements") }
+                val plusOneCNeonTimedWork = iterationTiming { plusOneCNeon(numbersPlusOneCopy) }.apply{ log("$plusOneCNeonTag: $numElements") }
                 addTimedWork(plusOneCNeonTag, numElements, plusOneCNeonTimedWork)
 
                 // plus one in-place Kotlin
@@ -233,7 +276,7 @@ class MainActivity : AppCompatActivity() {
                 for(i in 0..numbersPlusOneCopy.lastIndex){numbersPlusOneCopy[i] = randomNumbers[i]}
                 val plusOneKotlinTimedWork = iterationTiming{ for(i in numbersPlusOneCopy.indices){
                     numbersPlusOneCopy[i] += 1 }
-                }.apply { log("$plusOneKotlinTag:  $numElements") }
+                }.apply { log("$plusOneKotlinTag: $numElements") }
                 addTimedWork(plusOneKotlinTag, numElements, plusOneKotlinTimedWork)
 
                 // plus one map Kotlin
@@ -241,22 +284,45 @@ class MainActivity : AppCompatActivity() {
                 var numbersKotlinMapPlusOne: List<Int>
                 val plusOneKotlinMapTimedWork = iterationTiming{
                     numbersKotlinMapPlusOne = randomNumbers.map { it + 1 }
-                }.apply { log("$plusOneKotlinMapTag:  $numElements") }
+                }.apply { log("$plusOneKotlinMapTag: $numElements") }
                 addTimedWork(plusOneKotlinMapTag, numElements, plusOneKotlinMapTimedWork)
+
+                // sum C
+                val sumCTag = "Sum C"
+                val sumCTimedWork = iterationTiming {
+                    sum += sumC(sumNumbers)
+                }.apply { log("$sumCTag: $numElements") }
+                addTimedWork(sumCTag, numElements, sumCTimedWork)
+
+                // sum Kotlin
+                val sumKotlinIntArraySumTag = "Sum Kotlin (IntArray.Sum)"
+                val sumKotlinIntArraySumTimedWork = iterationTiming {
+                    sum += sumNumbers.sum()
+                }.apply { log("$sumKotlinIntArraySumTag: $numElements") }
+                addTimedWork(sumKotlinIntArraySumTag, numElements, sumKotlinIntArraySumTimedWork)
+
+                // sum Kotlin C-Style
+                val sumKotlinCStyleTag = "Sum Kotlin (C-style)"
+                val sumKotlinCStyleTimedWork = iterationTiming {
+                    var localSum = 0
+                    for(i in 0..sumNumbers.lastIndex) { localSum += sumNumbers[i] }
+                    sum += localSum
+                }.apply { log("$sumKotlinCStyleTag: $numElements") }
+                addTimedWork(sumKotlinCStyleTag, numElements, sumKotlinCStyleTimedWork)
 
                 // default sort in Kotlin
                 val sortKotlinTag = "Sorting in Kotlin"
-                val sortKotlinTimedWork = iterationTiming(setup = numbersCopy){ it.sort() }.apply { log("$sortKotlinTag:  $numElements") }
+                val sortKotlinTimedWork = iterationTiming(setup = numbersCopy){ it.sort() }.apply { log("$sortKotlinTag: $numElements") }
                 addTimedWork(sortKotlinTag, numElements, sortKotlinTimedWork)
 
                 // default sort in C
                 val sortCTag = "Sorting in C"
-                val sortCTimedWork = iterationTiming(setup = numbersCopy){ sortC(it) }.apply { log("$sortCTag:  $numElements") }
+                val sortCTimedWork = iterationTiming(setup = numbersCopy){ sortC(it) }.apply { log("$sortCTag: $numElements") }
                 addTimedWork(sortCTag, numElements, sortCTimedWork)
 
                 // default reverse in Kotlin
                 val reverseKotlinTag = "Default reverse in Kotlin"
-                val reverseKotlinTimedWork = iterationTiming{ randomNumbers.reverse() }.apply { log("$reverseKotlinTag:  $numElements") }
+                val reverseKotlinTimedWork = iterationTiming{ randomNumbers.reverse() }.apply { log("$reverseKotlinTag: $numElements") }
                 addTimedWork(reverseKotlinTag, numElements, reverseKotlinTimedWork)
 
                 // C-equivalent reverse in Kotlin
@@ -268,12 +334,12 @@ class MainActivity : AppCompatActivity() {
                         randomNumbers[left++] = randomNumbers[right];
                         randomNumbers[right--] = tmp;
                     }
-                }.apply { log("$reverseKotlinCStyleTag:  $numElements") }
+                }.apply { log("$reverseKotlinCStyleTag: $numElements") }
                 addTimedWork(reverseKotlinCStyleTag, numElements, reverseKotlinTimedWork)
 
                 // reverse array in C
                 val reverseCTag = "Reverse in C"
-                val reverseCTimedWork = iterationTiming{ reverseIntArrayC(randomNumbers) }.apply { log("$reverseCTag:  $numElements") }
+                val reverseCTimedWork = iterationTiming{ reverseIntArrayC(randomNumbers) }.apply { log("$reverseCTag: $numElements") }
                 addTimedWork(reverseCTag, numElements, reverseCTimedWork)
 
                 // reverse string in Kotlin
@@ -281,7 +347,7 @@ class MainActivity : AppCompatActivity() {
                 var reversedKotlinString: String
                 val reverseStringKotlinTimedWork = iterationTiming{
                     reversedKotlinString = randomString.reversed()
-                }.apply { log("$reverseStringKotlinTag:  $numElements") }
+                }.apply { log("$reverseStringKotlinTag: $numElements") }
                 addTimedWork(reverseStringKotlinTag, numElements, reverseStringKotlinTimedWork)
 
                 // reverse string in Kotlin
@@ -289,17 +355,18 @@ class MainActivity : AppCompatActivity() {
                 var reversedCString: String
                 val reverseStringCTimedWork = iterationTiming{
                     reversedCString = reverseStringC(randomString)
-                }.apply { log("$reverseStringCTag:  $numElements") }
+                }.apply { log("$reverseStringCTag: $numElements") }
                 addTimedWork(reverseStringCTag, numElements, reverseStringCTimedWork)
             }
+            Log.d(DEBUG_LOG_TAG, "The ending sum was: $sum")
 
             launch(Dispatchers.IO){
                 val path = getExternalFilesDir(null)
                 if(path == null) Log.e(DEBUG_LOG_TAG, "Couldn't create file to output .csv")
                 val file = File(path, "jni_performance_data-${System.currentTimeMillis()}.csv")
                 val fileContents = StringBuilder()
-                fileContents.append("Manufacturer,Model,Processor Count\n")
-                fileContents.append("${cpuInfo.manufacturer},${cpuInfo.model},${cpuInfo.processorCount}\n")
+                fileContents.append("Manufacturer,Model,Processor Count,Measured Frequency,Timer Overhead\n")
+                fileContents.append("${cpuInfo.manufacturer},${cpuInfo.model},${cpuInfo.processorCount},${frequencyToHz(getMeasuredFrequency())},${clocksToSeconds(timerOverhead.maxClocks)}\n")
                 fileContents.append("\nElement Count,")
                 testNumberOfElements.forEach { fileContents.append("$it,") }
                 fileContents.replace(fileContents.lastIndex, fileContents.lastIndex+1, "\n")
@@ -307,23 +374,27 @@ class MainActivity : AppCompatActivity() {
                     val testName = timedWorkEntry.key
                     fileContents.append("$testName,")
                     timedWorkEntry.value.forEach{(numElements, work) ->
-                         fileContents.append("${clocksToSeconds(work.minClocks)},")
+                         fileContents.append("${clocksToString(work.minClocks)},")
                     }
                     fileContents.replace(fileContents.lastIndex, fileContents.lastIndex+1, "\n")
                 }
                 file.writeText(fileContents.toString())
             }
+
+            launch(Dispatchers.Main) {
+                Toast.makeText(applicationContext, "Performance test complete!", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
-    private fun time(work: () -> Unit): Int { val startClocks = getClocks(); work(); return getClocks() - startClocks; }
+    private fun time(work: () -> Unit): Long { val startClocks = getClocks(); work(); return getClocks() - startClocks; }
 
 
     private fun iterationTiming(maxIterationsNoChange: Int = 10, work: () -> Unit): TimedWork {
         var iterationsSinceChange = 0
         var totalIterations = 0
-        var minSecs = Int.MAX_VALUE
-        var maxSecs = Int.MIN_VALUE
+        var minSecs = Long.MAX_VALUE
+        var maxSecs = Long.MIN_VALUE
         while(iterationsSinceChange < maxIterationsNoChange) {
             val secs = time(work)
             iterationsSinceChange += 1; totalIterations += 1;
@@ -336,8 +407,8 @@ class MainActivity : AppCompatActivity() {
     private fun <T> iterationTiming(maxIterationsNoChange: Int = 10, setup: () -> T, work: (T) -> Unit): TimedWork {
         var iterationsSinceChange = 0
         var totalIterations = 0
-        var minSecs = Int.MAX_VALUE
-        var maxSecs = Int.MIN_VALUE
+        var minSecs = Long.MAX_VALUE
+        var maxSecs = Long.MIN_VALUE
         while(iterationsSinceChange < maxIterationsNoChange) {
             val input = setup()
             val secs = time { work(input) }

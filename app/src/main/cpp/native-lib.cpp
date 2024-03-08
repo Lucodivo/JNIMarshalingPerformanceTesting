@@ -21,7 +21,7 @@
   #define logTime(...)
 #endif
 
-global_variable u64 estimateCPUFrequency;
+global_variable u64 estimateCPUFrequency = -1;
 
 JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNIEnv* env;
@@ -35,9 +35,12 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 
   // Register your class' native methods.
   static const JNINativeMethod methods[] = {
+      {"getMeasuredFrequency", "()J", reinterpret_cast<void*>(getMeasuredFrequency)},
       {"stringFromJni", "()Ljava/lang/String;", reinterpret_cast<void*>(stringFromJni)},
-      {"getClocks", "()I", reinterpret_cast<void*>(getClocks)},
-      {"clocksToSeconds", "(I)D", reinterpret_cast<void*>(clocksToSeconds)},
+      {"nopC", "([I)V", reinterpret_cast<void*>(nopC)},
+      {"copyIntArrayC", "([I)[I", reinterpret_cast<void*>(copyIntArrayC)},
+      {"getClocks", "()J", reinterpret_cast<void*>(getClocks)},
+      {"clocksToSeconds", "(J)D", reinterpret_cast<void*>(clocksToSeconds)},
       {"sumC", "([I)I", reinterpret_cast<void*>(sumC)},
       {"sortC", "([I)V", reinterpret_cast<void*>(sortC)},
       {"plusOneC", "([I)V", reinterpret_cast<void*>(plusOneC)},
@@ -53,18 +56,32 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   return JNI_VERSION_1_6;
 }
 
-jint getClocks(JNIEnv*, jclass){ return ReadCPUTimer(); }
+jlong getClocks(JNIEnv*, jclass){ return ReadCPUTimer(); }
 
 jstring stringFromJni(JNIEnv* env, jclass) {
     return env->NewStringUTF("Hello from C++");
 }
 
-void initialize(){
-  estimateCPUFrequency = EstimateCPUTimerFreq(1000);
+void initialize(){ estimateCPUFrequency = EstimateCPUTimerFreq(1000); }
+
+jdouble clocksToSeconds(JNIEnv*, jclass, jlong clocks){
+  return (double)clocks / (double)estimateCPUFrequency;
 }
 
-jdouble clocksToSeconds(JNIEnv*, jclass, jint clocks){
-  return (double)clocks / (double)estimateCPUFrequency;
+void nopC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
+  jsize size = env->GetArrayLength(javaIntArrayPtr);
+  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+}
+
+jintArray copyIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
+  jsize size = env->GetArrayLength(javaIntArrayPtr);
+  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+  jintArray result;
+  result = env->NewIntArray(size);
+  env->SetIntArrayRegion(result, 0, size, body);
+  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+  return result;
 }
 
 jint sumC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
@@ -103,6 +120,8 @@ void reverseIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
 }
 
 void plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
+  // TODO: Investigate. Neon does not run any faster (about the same).
+  //  Is it being misused or is plusOneC being optimized to use it by compiler?
   jsize size = env->GetArrayLength(javaIntArrayPtr);
   jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
   int32x4_t plusOnex4 = vdupq_n_s32(1);
@@ -146,3 +165,5 @@ jstring reverseStringC(JNIEnv* env, jclass, jstring javaStringPtr){
   env->ReleaseStringChars(javaStringPtr, body);
   return result;
 }
+
+jlong getMeasuredFrequency(JNIEnv *env, jclass) { return estimateCPUFrequency; }
