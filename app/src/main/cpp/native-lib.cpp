@@ -1,7 +1,6 @@
 #include "native-lib.h"
 
 #include "noop_types.h"
-#include "profiler.cpp"
 
 #include <string>
 
@@ -21,8 +20,6 @@
   #define logTime(...)
 #endif
 
-global_variable u64 estimateCPUFrequency = -1;
-
 JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNIEnv* env;
   if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
@@ -35,12 +32,9 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 
   // Register your class' native methods.
   static const JNINativeMethod methods[] = {
-      {"getMeasuredFrequency", "()J", reinterpret_cast<void*>(getMeasuredFrequency)},
       {"stringFromJni", "()Ljava/lang/String;", reinterpret_cast<void*>(stringFromJni)},
-      {"nopC", "([I)V", reinterpret_cast<void*>(nopC)},
+      {"intArrayNopC", "([I)V", reinterpret_cast<void*>(nopC)},
       {"copyIntArrayC", "([I)[I", reinterpret_cast<void*>(copyIntArrayC)},
-      {"getClocks", "()J", reinterpret_cast<void*>(getClocks)},
-      {"clocksToSeconds", "(J)D", reinterpret_cast<void*>(clocksToSeconds)},
       {"sumC", "([I)I", reinterpret_cast<void*>(sumC)},
       {"sortC", "([I)V", reinterpret_cast<void*>(sortC)},
       {"plusOneC", "([I)V", reinterpret_cast<void*>(plusOneC)},
@@ -51,21 +45,11 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   jint rc = env->RegisterNatives(c, methods, sizeof(methods)/sizeof(JNINativeMethod));
   if (rc != JNI_OK) return rc;
 
-  initialize();
-
   return JNI_VERSION_1_6;
 }
 
-jlong getClocks(JNIEnv*, jclass){ return ReadCPUTimer(); }
-
 jstring stringFromJni(JNIEnv* env, jclass) {
     return env->NewStringUTF("Hello from C++");
-}
-
-void initialize(){ estimateCPUFrequency = EstimateCPUTimerFreq(1000); }
-
-jdouble clocksToSeconds(JNIEnv*, jclass, jlong clocks){
-  return (double)clocks / (double)estimateCPUFrequency;
 }
 
 void nopC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
@@ -165,5 +149,3 @@ jstring reverseStringC(JNIEnv* env, jclass, jstring javaStringPtr){
   env->ReleaseStringChars(javaStringPtr, body);
   return result;
 }
-
-jlong getMeasuredFrequency(JNIEnv *env, jclass) { return estimateCPUFrequency; }
