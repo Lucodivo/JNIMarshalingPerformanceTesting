@@ -8,15 +8,15 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.NANOSECONDS_PER_SECOND
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.copyIntArrayC
-import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.endNanosecondTimer
-import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.getNanosecondTimerDuration
+//import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.endNanosecondTimer
+//import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.getNanosecondTimerDuration
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.intArrayNopC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.plusOneC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.plusOneCNeon
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.reverseIntArrayC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.reverseStringC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.sortC
-import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.startNanosecondTimer
+//import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.startNanosecondTimer
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.stringFromJni
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.sumC
 import kotlinx.coroutines.Dispatchers
@@ -227,7 +227,7 @@ class MainActivity : AppCompatActivity() {
 
             TimedWork.logTimeHeader()
 
-            // 468 - 2760
+            // 104ns - 261ns
             val timerOverhead = iterationTiming{
                 val start = System.nanoTime()
                 val end = System.nanoTime()
@@ -235,8 +235,12 @@ class MainActivity : AppCompatActivity() {
             }.apply{ log("C Timer Overhead") }
 
             val timedWork = HashMap<String, ArrayList<Pair<Int, TimedWork>>>()
+/*
             val testNumberOfElements = arrayOf(1, 10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000)
             val testNumberOfElements_HighMemoryWork = arrayOf(1, 10, 100, 1_000, 10_000, 100_000, 1_000_000)
+*/
+            val testNumberOfElements = arrayOf(10_000_000)
+            val testNumberOfElements_HighMemoryWork = arrayOf(1_000_000)
             var sum = 0;
             fun addTimedWork(tag: String, dataSize: Int, work: TimedWork) {
                 if(!timedWork.containsKey(tag)) { timedWork[tag] = ArrayList() }
