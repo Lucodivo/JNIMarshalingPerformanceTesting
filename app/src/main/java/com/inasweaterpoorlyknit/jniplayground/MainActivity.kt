@@ -6,17 +6,19 @@ import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.NANOSECONDS_PER_MICROSECOND
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.NANOSECONDS_PER_MILLISECOND
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.NANOSECONDS_PER_SECOND
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.copyIntArrayC
-//import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.endNanosecondTimer
-//import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.getNanosecondTimerDuration
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.intArrayNopC
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.nopCriticalC
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.nopFastC
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.nopNormalC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.plusOneC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.plusOneCNeon
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.reverseIntArrayC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.reverseStringC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.sortC
-//import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.startNanosecondTimer
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.stringFromJni
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.sumC
 import kotlinx.coroutines.Dispatchers
@@ -50,13 +52,21 @@ fun Set<String>.concatenated(separator: String = " "): String {
     return concatStr.toString()
 }
 
-fun clocksToString(clocks: Long): String  {
-    val seconds = clocks.toDouble() / NANOSECONDS_PER_SECOND.toDouble()
-    return when {
-        seconds < 10.0e-6 -> { "${"%.2f".format(seconds*1_000_000_000)}ns" }
-        seconds < 1.0e-3 -> { "${"%.2f".format(seconds*1_000_000)}µs" }
-        seconds < 1.0 -> { "${"%.2f".format(seconds*1_000)}ms" }
-        else -> { "${"%.2f".format(seconds)}s" }
+fun nanosecondsToString(nanoseconds: Long): String  {
+    return when(nanoseconds) {
+        in 0..<1_000 -> { "${nanoseconds}ns" }
+        in 0..<1_000_000 -> {
+            val microseconds = nanoseconds.toDouble() / NANOSECONDS_PER_MICROSECOND.toDouble()
+            "${"%.2f".format(microseconds)}µs"
+        }
+        in 0..<1_000_000_000 -> {
+            val milliseconds = nanoseconds.toDouble() / NANOSECONDS_PER_MILLISECOND.toDouble()
+            "${"%.2f".format(milliseconds)}ms"
+        }
+        else -> {
+            val seconds = nanoseconds.toDouble() / NANOSECONDS_PER_SECOND.toDouble()
+            "${"%.2f".format(seconds)}s"
+        }
     }
 }
 
@@ -112,8 +122,8 @@ class MainActivity : AppCompatActivity() {
                 Log.d(DEBUG_LOG_TAG, toPrint.joinToString(""))
             }
 
-            logTwoColumn("$title (min)", clocksToString(minNanoseconds))
-            logTwoColumn("$title (max)", clocksToString(maxNanoseconds))
+            logTwoColumn("$title (min)", nanosecondsToString(minNanoseconds))
+            logTwoColumn("$title (max)", nanosecondsToString(maxNanoseconds))
             logTwoColumn("$title (iterations)", "$totalIterations")
         }
     }
@@ -227,12 +237,33 @@ class MainActivity : AppCompatActivity() {
 
             TimedWork.logTimeHeader()
 
-            // 104ns - 261ns
+            // timer overhead
             val timerOverhead = iterationTiming{
                 val start = System.nanoTime()
                 val end = System.nanoTime()
                 end - start
-            }.apply{ log("C Timer Overhead") }
+            }.apply{ log("System.nanoTime() Timer Overhead") }
+
+            iterationTiming{
+                val start = System.nanoTime()
+                nopNormalC()
+                val end = System.nanoTime()
+                end - start
+            }.apply{ log("Nop Normal C") }
+
+            iterationTiming{
+                val start = System.nanoTime()
+                nopFastC()
+                val end = System.nanoTime()
+                end - start
+            }.apply{ log("Nop Fast C") }
+
+            iterationTiming{
+                val start = System.nanoTime()
+                nopCriticalC()
+                val end = System.nanoTime()
+                end - start
+            }.apply{ log("Nop Native C") }
 
             val timedWork = HashMap<String, ArrayList<Pair<Int, TimedWork>>>()
 /*
@@ -262,12 +293,6 @@ class MainActivity : AppCompatActivity() {
                 val numElementsString = "[${"%,d".format(numElements)}]"
                 val randomString = randomASCIIString(numElements)
 
-                // timer overhead
-                iterationTiming{
-                    val start = System.nanoTime()
-                    val end = System.nanoTime()
-                    end - start
-                }.apply{ log("C Timer Overhead") }
 
                 val copyIntArrayCTag = "copy Int Array C"
                 val copyIntArrayCTimedWork = iterationTiming{
@@ -472,7 +497,7 @@ class MainActivity : AppCompatActivity() {
                     val testName = timedWorkEntry.key
                     fileContents.append("$testName,")
                     timedWorkEntry.value.forEach{(numElements, work) ->
-                         fileContents.append("${clocksToString(work.minNanoseconds)},")
+                         fileContents.append("${nanosecondsToString(work.minNanoseconds)},")
                     }
                     fileContents.replace(fileContents.lastIndex, fileContents.lastIndex+1, "\n")
                 }
