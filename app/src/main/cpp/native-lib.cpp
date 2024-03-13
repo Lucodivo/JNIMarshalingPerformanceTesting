@@ -14,15 +14,11 @@
   #define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, APP_NAME, __VA_ARGS__))
   #define logTime(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, APP_NAME, __VA_ARGS__))
 #elif
-  define LOGI(...)
+  #define LOGI(...)
   #define LOGW(...)
   #define LOGE(...)
   #define logTime(...)
 #endif
-
-void nopNormalC(JNIEnv* env, jclass){}
-void nopFastC(JNIEnv* env, jclass){}
-void nopCriticalC(){}
 
 JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNIEnv* env;
@@ -55,8 +51,12 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   return JNI_VERSION_1_6;
 }
 
+void nopNormalC(JNIEnv* env, jclass){}
+void nopFastC(JNIEnv* env, jclass){}
+void nopCriticalC(){}
+
 jstring stringFromJni(JNIEnv* env, jclass) {
-    return env->NewStringUTF("Hello from C++");
+    return env->NewStringUTF("Hello, World!");
 }
 
 void nopIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
@@ -94,27 +94,29 @@ void sortC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
   env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
 }
 
-void plusOneC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
+void plusOneC(JNIEnv *env, jclass, jintArray javaIntArrayPtr) {
   jsize size = env->GetArrayLength(javaIntArrayPtr);
-  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
-  for(jsize i = 0; i < size; i++){ body[i] += 1; }
+  jint *body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+  for (jsize i = 0;
+       i < size;
+       i++) {
+    body[i] += 1;
+  }
   env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
 }
 
 void plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
-    // TODO: Investigate. Neon does not run any faster (about the same).
-    //  Is it being misused or is plusOneC being optimized to use it by compiler?
     jsize size = env->GetArrayLength(javaIntArrayPtr);
     jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
-    int32x4_t plusOnex4 = vdupq_n_s32(1);
-    for(size_t i = 0; i < (size / 4); i++) {
-        int32_t* ptr = body + (i*4);
-        int32x4_t arrayVals = vld1q_s32(ptr);
-        vst1q_s32(ptr, vaddq_s32(arrayVals, plusOnex4));
+    jsize remainingElements = size % 4;
+    jsize i = 0;
+    for(; i < size - remainingElements; i += 4) {
+      int32x4_t neonVector = vld1q_s32(&body[i]);
+      neonVector = vaddq_s32(neonVector, vdupq_n_s32(1));
+      vst1q_s32(&body[i], neonVector);
     }
-    // plus one the remainder
-    if(size & 3) {
-        for(jsize i = size - (size & 3); i < size; i++) { body[i] += 1; }
+    for (; i < size; ++i) {
+      body[i] += 1;
     }
     env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
 }

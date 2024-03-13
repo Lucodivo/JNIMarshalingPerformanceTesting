@@ -15,23 +15,23 @@ android {
         versionCode = 1
         versionName = "1.0"
         ndk.abiFilters += setOf("armeabi-v7a", "arm64-v8a")
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        externalNativeBuild {
-            cmake {
-                cppFlags += "-std=c++17"
-            }
-        }
     }
 
     buildTypes {
         release {
+//            isDebuggable = true
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("debug")
+/*
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
+*/
         }
         debug {
             isDebuggable = true
