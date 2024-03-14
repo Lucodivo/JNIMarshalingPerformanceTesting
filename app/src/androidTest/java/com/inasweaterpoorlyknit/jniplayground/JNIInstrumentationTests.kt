@@ -24,7 +24,7 @@ class JNIInstrumentationTests {
 
     @Test
     fun stringFromJNI() {
-        assertEquals("Hello from C++", JNIFunctions.stringFromJni())
+        assertEquals("Hello, World!", JNIFunctions.stringFromJni())
     }
 
     @Test
@@ -61,6 +61,37 @@ class JNIInstrumentationTests {
         numbersKotlin.reverse()
         JNIFunctions.reverseIntArrayC(numbersC)
         assertArrayEquals(numbersC, numbersKotlin)
+    }
+
+    @Test
+    fun rotateC() {
+        val arraySize = 10_000
+        val numbers = randomIntArray(arraySize)
+        val numbersC = numbers.copyOf()
+        val rotateCount = arraySize / 3
+        val rotateExpected = IntArray(arraySize){
+            if(it < rotateCount){
+                numbers[arraySize - rotateCount + it]
+            } else {
+                numbers[it - rotateCount]
+            }
+        }
+
+        JNIFunctions.rotateIntArrayC(numbersC, rotateCount)
+
+        assertArrayEquals(rotateExpected, numbersC)
+    }
+
+    @Test
+    fun rotateC_equalToKotlinMirror() {
+        val arraySize = 10_000
+        val numbers = randomIntArray(arraySize)
+        val numbersC = numbers.copyOf()
+        val rotateCount = arraySize / 3
+
+        JNIFunctions.rotateIntArrayC(numbersC, rotateCount)
+
+        assertArrayEquals(numbers.apply { rotateRight(rotateCount) }, numbersC)
     }
 
     @Test

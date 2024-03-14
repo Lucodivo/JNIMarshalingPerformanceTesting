@@ -10,6 +10,7 @@ extern "C" JNIEXPORT void JNICALL nopCriticalC();
 extern "C" JNIEXPORT void JNICALL nopIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
 extern "C" JNIEXPORT jintArray JNICALL copyIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
 extern "C" JNIEXPORT void JNICALL reverseIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
+extern "C" JNIEXPORT void JNICALL rotateRightC(JNIEnv* env, jclass, jintArray javaIntArrayPtr, jint rotateCount);
 extern "C" JNIEXPORT void JNICALL plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
 extern "C" JNIEXPORT void JNICALL plusOneC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);
 extern "C" JNIEXPORT void JNICALL sortC(JNIEnv* env, jclass, jintArray javaIntArrayPtr);

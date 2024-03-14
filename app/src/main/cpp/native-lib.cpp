@@ -42,6 +42,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       {"sortC", "([I)V", reinterpret_cast<void*>(sortC)},
       {"plusOneC", "([I)V", reinterpret_cast<void*>(plusOneC)},
       {"reverseIntArrayC", "([I)V", reinterpret_cast<void*>(reverseIntArrayC)},
+      {"rotateIntArrayC", "([II)V", reinterpret_cast<void*>(rotateRightC)},
       {"plusOneCNeon", "([I)V", reinterpret_cast<void*>(plusOneCNeon)},
       {"reverseStringC", "(Ljava/lang/String;)Ljava/lang/String;", reinterpret_cast<void*>(reverseStringC)},
   };
@@ -94,6 +95,41 @@ void sortC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
   env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
 }
 
+void rotateRightC(JNIEnv* env, jclass, jintArray javaIntArrayPtr, jint rotateCount){
+  jsize size = env->GetArrayLength(javaIntArrayPtr);
+  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+
+  jsize rotateInBounds = (rotateCount % size);
+  if(rotateInBounds == 0){ return; }
+
+  // reverse entire int array
+  // [1, 2, 3, 4, 5] -> [5, 4, 3, 2, 1]
+  jsize left = 0, right = size - 1;
+  jint tmp;
+  while(left < right){
+    tmp = body[left];
+    body[left++] = body[right];
+    body[right--] = tmp;
+  }
+
+  // reverse both sides with rotateCount as pivot (pivot index is included as part of the right side)
+  // rotate right 3: [5, 4, 3, {2} , 1] -> [3, 4, 5, 1, 2]
+  left = 0; right = rotateInBounds - 1;
+  while(left < right){
+    tmp = body[left];
+    body[left++] = body[right];
+    body[right--] = tmp;
+  }
+  left = rotateInBounds; right = size - 1;
+  while(left < right){
+    tmp = body[left];
+    body[left++] = body[right];
+    body[right--] = tmp;
+  }
+
+  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+}
+
 void plusOneC(JNIEnv *env, jclass, jintArray javaIntArrayPtr) {
   jsize size = env->GetArrayLength(javaIntArrayPtr);
   jint *body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
@@ -126,7 +162,11 @@ void reverseIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
   jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
   jsize left = 0, right = size - 1;
   jint tmp;
-  while(left < right){ tmp = body[left]; body[left++] = body[right]; body[right--] = tmp; }
+  while(left < right){
+    tmp = body[left];
+    body[left++] = body[right];
+    body[right--] = tmp;
+  }
   env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
 }
 

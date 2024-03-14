@@ -49,6 +49,10 @@ class JNIFunctions {
 
         @FastNative
         @JvmStatic
+        external fun rotateIntArrayC(nums: IntArray, rotateCount: Int)
+
+        @FastNative
+        @JvmStatic
         external fun reverseStringC(str: String): String
     }
 }

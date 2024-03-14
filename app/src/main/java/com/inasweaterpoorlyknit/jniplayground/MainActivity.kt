@@ -275,36 +275,19 @@ class MainActivity : AppCompatActivity() {
 
             val timedWork = HashMap<String, ArrayList<Pair<Int, TimedWork>>>()
 
-            val testNumberOfElements = arrayOf(
-                1,
-                10,
-                100,
-                1_000,
-                10_000,
-                100_000,
-                1_000_000
-            )
-            val testNumberOfElements_HighMemoryWork = arrayOf(
-                1,
-                10,
-                100,
-                1_000,
-                10_000,
-                100_000,
-                1_000_000
-            )
+            val testNumberOfElements = arrayOf(/*1, 10, 100, 1_000, 10_000,*/ 100_000/*, 1_000_000*/)
 
-            var sum = 0
             fun addTimedWork(tag: String, dataSize: Int, work: TimedWork) {
                 if(!timedWork.containsKey(tag)) { timedWork[tag] = ArrayList() }
                 timedWork.getOrPut(tag){ ArrayList() }.add(Pair(dataSize, work))
             }
 
-            testNumberOfElements_HighMemoryWork.forEach { numElements ->
+            testNumberOfElements.forEach { numElements ->
                 val randomNumbers = IntArray(numElements) { rand.nextInt() }
                 val numbersCopy: () -> IntArray = { randomNumbers.copyOf() }
                 val numElementsString = "[${"%,d".format(numElements)}]"
                 val randomString = randomASCIIString(numElements)
+                val sumNumbers = IntArray(numElements) { rand.nextInt(-10, 11) }
 
                 val copyIntArrayCTag = "C: Copy Int Array"
                 val copyIntArrayCTimedWork = iterationTiming{
@@ -382,13 +365,6 @@ class MainActivity : AppCompatActivity() {
                     end - start
                 }.apply { log("$reverseStringCTag $numElementsString") }
                 addTimedWork(reverseStringCTag, numElements, reverseStringCTimedWork)
-            }
-
-            testNumberOfElements.forEach { numElements ->
-                val randomNumbers = IntArray(numElements) { rand.nextInt() }
-                val numbersCopy: () -> IntArray = { randomNumbers.copyOf() }
-                val sumNumbers = IntArray(numElements) { rand.nextInt(-10, 11) }
-                val numElementsString = "[${"%,d".format(numElements)}]"
 
                 val nopIntArrayCTag = "C: Nop Int Array Paremeter (@FastNative)"
                 val nopIntArrayCTimedWork = iterationTiming{
@@ -429,32 +405,44 @@ class MainActivity : AppCompatActivity() {
                 }.apply { log("$plusOneKotlinTag $numElementsString") }
                 addTimedWork(plusOneKotlinTag, numElements, plusOneKotlinTimedWork)
 
+                var cSum = 0
                 val sumCTag = "C: Sum"
                 val sumCTimedWork = iterationTiming {
                     val start = System.nanoTime()
-                    sum += sumC(sumNumbers)
+                    var sum = 0
+                    sum = sumC(sumNumbers)
                     val end = System.nanoTime()
+                    cSum = sum
                     end - start
                 }.apply { log("$sumCTag $numElementsString") }
                 addTimedWork(sumCTag, numElements, sumCTimedWork)
 
+                var kotlinSum = 0
+                val sumCStyleKotlinTag = "Kotlin: Sum (C-style)"
+                val sumCStyleKotlinTimedWork = iterationTiming {
+                    val start = System.nanoTime()
+                    var sum = 0
+                    for(i in 0..sumNumbers.lastIndex) { sum += sumNumbers[i] }
+                    val end = System.nanoTime()
+                    kotlinSum = sum
+                    end - start
+                }.apply { log("$sumCStyleKotlinTag $numElementsString") }
+                addTimedWork(sumCStyleKotlinTag, numElements, sumCStyleKotlinTimedWork)
+
+                var kotlinSumSum = 0
                 val sumKotlinIntArraySumTag = "Kotlin: Sum (IntArray.Sum)"
                 val sumKotlinIntArraySumTimedWork = iterationTiming {
                     val start = System.nanoTime()
-                    sum += sumNumbers.sum()
+                    val sum = sumNumbers.sum()
                     val end = System.nanoTime()
+                    kotlinSumSum = sum
                     end - start
                 }.apply { log("$sumKotlinIntArraySumTag $numElementsString") }
                 addTimedWork(sumKotlinIntArraySumTag, numElements, sumKotlinIntArraySumTimedWork)
 
-                val sumCStyleKotlinTag = "Kotlin: Sum (C-style)"
-                val sumCStyleKotlinTimedWork = iterationTiming {
-                    val start = System.nanoTime()
-                    for(i in 0..sumNumbers.lastIndex) { sum += sumNumbers[i] }
-                    val end = System.nanoTime()
-                    end - start
-                }.apply { log("$sumCStyleKotlinTag $numElementsString") }
-                addTimedWork(sumCStyleKotlinTag, numElements, sumCStyleKotlinTimedWork)
+                Log.w(DEBUG_LOG_TAG, "C Sum: $cSum")
+                Log.w(DEBUG_LOG_TAG, "Kotlin Sum: $kotlinSum")
+                Log.w(DEBUG_LOG_TAG, "Kotlin Sum Sum: $kotlinSumSum")
 
                 val reverseIntArrayKotlinTag = "Kotlin: Reverse Int Array (default)"
                 val reverseIntArrayKotlinTimedWork = iterationTiming{
@@ -479,7 +467,6 @@ class MainActivity : AppCompatActivity() {
                 }.apply { log("$reverseCStyleKotlinTag $numElementsString") }
                 addTimedWork(reverseCStyleKotlinTag, numElements, reverseCStyleKotlinTimedWork)
             }
-            Log.d(DEBUG_LOG_TAG, "The ending sum was: $sum")
 
             launch(Dispatchers.IO){
                 val path = getExternalFilesDir(null)
