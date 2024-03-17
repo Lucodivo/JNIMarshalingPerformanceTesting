@@ -77,7 +77,7 @@ class JNIInstrumentationTests {
             }
         }
 
-        JNIFunctions.rotateIntArrayC(numbersC, rotateCount)
+        JNIFunctions.rotateRightIntArrayC(numbersC, rotateCount)
 
         assertArrayEquals(rotateExpected, numbersC)
     }
@@ -89,7 +89,7 @@ class JNIInstrumentationTests {
         val numbersC = numbers.copyOf()
         val rotateCount = arraySize / 3
 
-        JNIFunctions.rotateIntArrayC(numbersC, rotateCount)
+        JNIFunctions.rotateRightIntArrayC(numbersC, rotateCount)
 
         assertArrayEquals(numbers.apply { rotateRight(rotateCount) }, numbersC)
     }

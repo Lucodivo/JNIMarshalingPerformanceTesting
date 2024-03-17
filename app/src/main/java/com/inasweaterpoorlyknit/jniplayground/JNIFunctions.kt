@@ -2,6 +2,7 @@ package com.inasweaterpoorlyknit.jniplayground
 
 import dalvik.annotation.optimization.CriticalNative
 import dalvik.annotation.optimization.FastNative
+import java.lang.annotation.Native
 
 class JNIFunctions {
     companion object {
@@ -23,6 +24,9 @@ class JNIFunctions {
         @FastNative
         @JvmStatic
         external fun intArrayNopC(nums: IntArray)
+        @FastNative
+        @JvmStatic
+        external fun intArrayArgIsCopyC(nums: IntArray): Boolean
 
         @FastNative
         @JvmStatic
@@ -49,7 +53,7 @@ class JNIFunctions {
 
         @FastNative
         @JvmStatic
-        external fun rotateIntArrayC(nums: IntArray, rotateCount: Int)
+        external fun rotateRightIntArrayC(nums: IntArray, rotateCount: Int)
 
         @FastNative
         @JvmStatic

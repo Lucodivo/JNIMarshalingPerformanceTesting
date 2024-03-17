@@ -37,12 +37,13 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       {"nopCriticalC", "()V", reinterpret_cast<void*>(nopCriticalC)},
       {"stringFromJni", "()Ljava/lang/String;", reinterpret_cast<void*>(stringFromJni)},
       {"intArrayNopC", "([I)V", reinterpret_cast<void *>(nopIntArrayC)},
+      {"intArrayArgIsCopyC", "([I)Z", reinterpret_cast<void *>(arrayArgIsCopyC)},
       {"copyIntArrayC", "([I)[I", reinterpret_cast<void*>(copyIntArrayC)},
       {"sumC", "([I)I", reinterpret_cast<void*>(sumC)},
       {"sortC", "([I)V", reinterpret_cast<void*>(sortC)},
       {"plusOneC", "([I)V", reinterpret_cast<void*>(plusOneC)},
       {"reverseIntArrayC", "([I)V", reinterpret_cast<void*>(reverseIntArrayC)},
-      {"rotateIntArrayC", "([II)V", reinterpret_cast<void*>(rotateRightC)},
+      {"rotateRightIntArrayC", "([II)V", reinterpret_cast<void*>(rotateRightC)},
       {"plusOneCNeon", "([I)V", reinterpret_cast<void*>(plusOneCNeon)},
       {"reverseStringC", "(Ljava/lang/String;)Ljava/lang/String;", reinterpret_cast<void*>(reverseStringC)},
   };
@@ -60,27 +61,34 @@ jstring stringFromJni(JNIEnv* env, jclass) {
     return env->NewStringUTF("Hello, World!");
 }
 
-void nopIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
-  jsize size = env->GetArrayLength(javaIntArrayPtr);
-  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
-  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+void nopIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayHandle){
+  jsize size = env->GetArrayLength(javaIntArrayHandle);
+  jint* body = env->GetIntArrayElements(javaIntArrayHandle, NULL);
+  env->ReleaseIntArrayElements(javaIntArrayHandle, body, 0);
 }
 
-jintArray copyIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
-  jsize size = env->GetArrayLength(javaIntArrayPtr);
-  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+jboolean arrayArgIsCopyC(JNIEnv* env, jclass, jintArray javaIntArrayHandle){
+  jboolean isCopy = false;
+  jint* body = env->GetIntArrayElements(javaIntArrayHandle, &isCopy);
+  env->ReleaseIntArrayElements(javaIntArrayHandle, body, 0);
+  return isCopy;
+}
+
+jintArray copyIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayHandle){
+  jsize size = env->GetArrayLength(javaIntArrayHandle);
+  jint* body = env->GetIntArrayElements(javaIntArrayHandle, NULL);
   jintArray result;
   result = env->NewIntArray(size);
   env->SetIntArrayRegion(result, 0, size, body);
-  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+  env->ReleaseIntArrayElements(javaIntArrayHandle, body, 0);
   return result;
 }
 
-jint sumC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
-  jsize size = env->GetArrayLength(javaIntArrayPtr);
+jint sumC(JNIEnv* env, jclass, jintArray javaIntArrayHandle){
+  jsize size = env->GetArrayLength(javaIntArrayHandle);
   jint* javaIntArray = new jint[size];
-  env->GetIntArrayRegion(javaIntArrayPtr, jsize{0}, size, javaIntArray);
-  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+  env->GetIntArrayRegion(javaIntArrayHandle, jsize{0}, size, javaIntArray);
+  jint* body = env->GetIntArrayElements(javaIntArrayHandle, NULL);
   jint sum = 0;
   for(jsize i = 0; i < size; i++) {
     sum += body[i];
@@ -88,16 +96,16 @@ jint sumC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
   return sum;
 }
 
-void sortC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
-  jsize size = env->GetArrayLength(javaIntArrayPtr);
-  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+void sortC(JNIEnv* env, jclass, jintArray javaIntArrayHandle){
+  jsize size = env->GetArrayLength(javaIntArrayHandle);
+  jint* body = env->GetIntArrayElements(javaIntArrayHandle, NULL);
   std::sort(body, body + size);
-  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+  env->ReleaseIntArrayElements(javaIntArrayHandle, body, 0);
 }
 
-void rotateRightC(JNIEnv* env, jclass, jintArray javaIntArrayPtr, jint rotateCount){
-  jsize size = env->GetArrayLength(javaIntArrayPtr);
-  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+void rotateRightC(JNIEnv* env, jclass, jintArray javaIntArrayHandle, jint rotateCount){
+  jsize size = env->GetArrayLength(javaIntArrayHandle);
+  jint* body = env->GetIntArrayElements(javaIntArrayHandle, NULL);
 
   jsize rotateInBounds = (rotateCount % size);
   if(rotateInBounds == 0){ return; }
@@ -127,23 +135,23 @@ void rotateRightC(JNIEnv* env, jclass, jintArray javaIntArrayPtr, jint rotateCou
     body[right--] = tmp;
   }
 
-  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+  env->ReleaseIntArrayElements(javaIntArrayHandle, body, 0);
 }
 
-void plusOneC(JNIEnv *env, jclass, jintArray javaIntArrayPtr) {
-  jsize size = env->GetArrayLength(javaIntArrayPtr);
-  jint *body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+void plusOneC(JNIEnv *env, jclass, jintArray javaIntArrayHandle) {
+  jsize size = env->GetArrayLength(javaIntArrayHandle);
+  jint *body = env->GetIntArrayElements(javaIntArrayHandle, NULL);
   for (jsize i = 0;
        i < size;
        i++) {
     body[i] += 1;
   }
-  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+  env->ReleaseIntArrayElements(javaIntArrayHandle, body, 0);
 }
 
-void plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
-    jsize size = env->GetArrayLength(javaIntArrayPtr);
-    jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+void plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayHandle){
+    jsize size = env->GetArrayLength(javaIntArrayHandle);
+    jint* body = env->GetIntArrayElements(javaIntArrayHandle, NULL);
     jsize remainingElements = size % 4;
     jsize i = 0;
     for(; i < size - remainingElements; i += 4) {
@@ -154,12 +162,12 @@ void plusOneCNeon(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
     for (; i < size; ++i) {
       body[i] += 1;
     }
-    env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+    env->ReleaseIntArrayElements(javaIntArrayHandle, body, 0);
 }
 
-void reverseIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
-  jsize size = env->GetArrayLength(javaIntArrayPtr);
-  jint* body = env->GetIntArrayElements(javaIntArrayPtr, NULL);
+void reverseIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayHandle){
+  jsize size = env->GetArrayLength(javaIntArrayHandle);
+  jint* body = env->GetIntArrayElements(javaIntArrayHandle, NULL);
   jsize left = 0, right = size - 1;
   jint tmp;
   while(left < right){
@@ -167,7 +175,7 @@ void reverseIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayPtr){
     body[left++] = body[right];
     body[right--] = tmp;
   }
-  env->ReleaseIntArrayElements(javaIntArrayPtr, body, 0);
+  env->ReleaseIntArrayElements(javaIntArrayHandle, body, 0);
 }
 
 jstring reverseStringC(JNIEnv* env, jclass, jstring javaStringPtr){
