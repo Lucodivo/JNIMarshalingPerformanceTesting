@@ -9,12 +9,20 @@ import androidx.lifecycle.lifecycleScope
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.NANOSECONDS_PER_MICROSECOND
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.NANOSECONDS_PER_MILLISECOND
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.NANOSECONDS_PER_SECOND
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.copyIntArrayC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.intArrayArgIsCopyC
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.intArrayNopC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.nopCriticalC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.nopFastC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.nopNormalC
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.plusOneC
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.plusOneCNeon
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.reverseIntArrayC
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.reverseStringC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.rotateRightIntArrayC
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.sortC
 import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.stringFromJni
+import com.inasweaterpoorlyknit.jniplayground.JNIFunctions.Companion.sumC
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -27,7 +35,7 @@ fun logd(msg: String) = Log.d(DEBUG_LOG_TAG, msg)
 fun loge(msg: String) = Log.e(DEBUG_LOG_TAG, msg)
 fun logi(msg: String) = Log.i(DEBUG_LOG_TAG, msg)
 
-const val ITERATIVE_TESTING_COUNT = 20
+const val ITERATIVE_TESTING_COUNT = 100
 
 fun List<String>.concatenated(separator: String = " "): String {
     val concatStr = StringBuilder()
@@ -215,7 +223,6 @@ class MainActivity : AppCompatActivity() {
     private fun performanceTests() {
         lifecycleScope.launch(Dispatchers.Default) {
             val rand = Random(123)
-/*
             Log.i(DEBUG_LOG_TAG, "Supported ABIs:" + Build.SUPPORTED_ABIS.fold(StringBuilder()){ acc, str -> acc.append(" $str") }).toString()
             Log.i(DEBUG_LOG_TAG,"Model: " + Build.MODEL)
             Log.i(DEBUG_LOG_TAG,"Manufacturer: " + Build.MANUFACTURER)
@@ -228,41 +235,41 @@ class MainActivity : AppCompatActivity() {
                 Log.i(DEBUG_LOG_TAG,"SoC Manufacturer: " + Build.SOC_MANUFACTURER)
                 Log.i(DEBUG_LOG_TAG,"SoC Model: " + Build.SOC_MODEL)
             }
-*/
+
             val cpuInfo = fetchCpuInfo()
-//            fetchRamInfo()
-//            cpuInfo.log()
-//
-//            TimedWork.logTimeHeader()
-//
-            val timerOverhead = iterationTiming(50){
+            fetchRamInfo()
+            cpuInfo.log()
+
+            TimedWork.logTimeHeader()
+
+            val timerOverhead = iterationTiming{
                 val start = System.nanoTime()
                 val end = System.nanoTime()
                 end - start
             }.apply{ log("System.nanoTime() Timer Overhead") }
 
-            val nopNormalCOverhead = iterationTiming(50){
+            val nopNormalCOverhead = iterationTiming{
                 val start = System.nanoTime()
                 nopNormalC()
                 val end = System.nanoTime()
                 end - start
             }.apply{ log("C: Nop Normal") }
 
-            val nopFastCOverhead = iterationTiming(50){
+            val nopFastCOverhead = iterationTiming{
                 val start = System.nanoTime()
                 nopFastC()
                 val end = System.nanoTime()
                 end - start
             }.apply{ log("C: Nop @FastNative") }
 
-            val nopCriticalCOverhead = iterationTiming(50){
+            val nopCriticalCOverhead = iterationTiming{
                 val start = System.nanoTime()
                 nopCriticalC()
                 val end = System.nanoTime()
                 end - start
             }.apply{ log("C: Nop @CriticalNative") }
 
-            val stringFromCTimedWork = iterationTiming(50){
+            val stringFromCTimedWork = iterationTiming{
                 val start = System.nanoTime()
                 stringFromJni()
                 val end = System.nanoTime()
@@ -287,25 +294,25 @@ class MainActivity : AppCompatActivity() {
                 intArrayIsCopy[index] = intArrayArgIsCopyC(randomNumbers)
                 Log.i(DEBUG_LOG_TAG, "intArrayArgIsCopyC ($numElements): ${intArrayIsCopy[index]}")
 
-//                val rotateRightCTag = "C: Rotate Right Int Array"
-//                val rotateCount = numElements / 3
-//                val rotateRightCTimedWork = iterationTiming{
-//                    val start = System.nanoTime()
-//                    rotateRightIntArrayC(randomNumbers, rotateCount)
-//                    val end = System.nanoTime()
-//                    end - start
-//                }.apply { log("$rotateRightCTag $numElementsString") }
-//                addTimedWork(rotateRightCTag, numElements, rotateRightCTimedWork)
-//
-//                val rotateRightKotlinTag = "Kotlin: Rotate Right Int Array"
-//                val rotateRightKotlinTimedWork = iterationTiming{
-//                    val start = System.nanoTime()
-//                    randomNumbers.rotateRight(rotateCount)
-//                    val end = System.nanoTime()
-//                    end - start
-//                }.apply { log("$rotateRightKotlinTag $numElementsString") }
-//                addTimedWork(rotateRightKotlinTag, numElements, rotateRightKotlinTimedWork)
-/*
+                val rotateRightCTag = "C: Rotate Right Int Array"
+                val rotateCount = numElements / 3
+                val rotateRightCTimedWork = iterationTiming{
+                    val start = System.nanoTime()
+                    rotateRightIntArrayC(randomNumbers, rotateCount)
+                    val end = System.nanoTime()
+                    end - start
+                }.apply { log("$rotateRightCTag $numElementsString") }
+                addTimedWork(rotateRightCTag, numElements, rotateRightCTimedWork)
+
+                val rotateRightKotlinTag = "Kotlin: Rotate Right Int Array"
+                val rotateRightKotlinTimedWork = iterationTiming{
+                    val start = System.nanoTime()
+                    randomNumbers.rotateRight(rotateCount)
+                    val end = System.nanoTime()
+                    end - start
+                }.apply { log("$rotateRightKotlinTag $numElementsString") }
+                addTimedWork(rotateRightKotlinTag, numElements, rotateRightKotlinTimedWork)
+
                 val copyIntArrayCTag = "C: Copy Int Array"
                 val copyIntArrayCTimedWork = iterationTiming{
                     val start = System.nanoTime()
@@ -323,15 +330,6 @@ class MainActivity : AppCompatActivity() {
                     end - start
                 }.apply { log("$copyIntArrayKotlinTag $numElementsString") }
                 addTimedWork(copyIntArrayKotlinTag, numElements, copyIntArrayKotlinTimedWork)
-
-                val plusOneMapKotlinTag = "Kotlin: +1 Map"
-                val plusOneMapKotlinTimedWork = iterationTiming{
-                    val start = System.nanoTime()
-                    randomNumbers.map { it + 1 }
-                    val end = System.nanoTime()
-                    end - start
-                }.apply { log("$plusOneMapKotlinTag $numElementsString") }
-                addTimedWork(plusOneMapKotlinTag, numElements, plusOneMapKotlinTimedWork)
 
                 val sortKotlinTag = "Kotlin: Sort"
                 val sortKotlinTimedWork = iterationTiming{
@@ -422,6 +420,15 @@ class MainActivity : AppCompatActivity() {
                 }.apply { log("$plusOneKotlinTag $numElementsString") }
                 addTimedWork(plusOneKotlinTag, numElements, plusOneKotlinTimedWork)
 
+                val plusOneMapKotlinTag = "Kotlin: +1 Map"
+                val plusOneMapKotlinTimedWork = iterationTiming{
+                    val start = System.nanoTime()
+                    randomNumbers.map { it + 1 }
+                    val end = System.nanoTime()
+                    end - start
+                }.apply { log("$plusOneMapKotlinTag $numElementsString") }
+                addTimedWork(plusOneMapKotlinTag, numElements, plusOneMapKotlinTimedWork)
+
                 var cSum = 0
                 val sumCTag = "C: Sum"
                 val sumCTimedWork = iterationTiming {
@@ -483,7 +490,6 @@ class MainActivity : AppCompatActivity() {
                     end - start
                 }.apply { log("$reverseCStyleKotlinTag $numElementsString") }
                 addTimedWork(reverseCStyleKotlinTag, numElements, reverseCStyleKotlinTimedWork)
-*/
             }
 
             launch(Dispatchers.IO){

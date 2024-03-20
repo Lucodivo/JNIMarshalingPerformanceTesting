@@ -6,11 +6,11 @@ plugins {
 android {
     namespace = "com.inasweaterpoorlyknit.jniplayground"
     compileSdk = 34
-
+    ndkVersion = "26.2.11394342"
 
     defaultConfig {
         applicationId = "com.inasweaterpoorlyknit.jniplayground"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -67,4 +67,5 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation(libs.androidx.benchmark.junit4)
 }

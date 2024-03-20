@@ -86,8 +86,6 @@ jintArray copyIntArrayC(JNIEnv* env, jclass, jintArray javaIntArrayHandle){
 
 jint sumC(JNIEnv* env, jclass, jintArray javaIntArrayHandle){
   jsize size = env->GetArrayLength(javaIntArrayHandle);
-  jint* javaIntArray = new jint[size];
-  env->GetIntArrayRegion(javaIntArrayHandle, jsize{0}, size, javaIntArray);
   jint* body = env->GetIntArrayElements(javaIntArrayHandle, NULL);
   jint sum = 0;
   for(jsize i = 0; i < size; i++) {

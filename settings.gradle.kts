@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "JNIPlayground"
 include(":app")
- 
+include(":benchmark")
